@@ -19,14 +19,23 @@ type Co2Reading = {
   timestamp: string;
 };
 
+type OpenAIResponseContent =
+  | {
+      type?: 'output_text' | string;
+      text?: string;
+    }
+  | {
+      type?: 'json' | 'json_schema';
+      json?: unknown;
+      name?: string;
+    }
+  | Record<string, unknown>;
+
 type OpenAIResponse = {
   output?: Array<{
-    content?: Array<{
-      type?: string;
-      text?: string;
-    }>;
+    content?: Array<OpenAIResponseContent>;
   }>;
-  output_text?: string;
+  output_text?: string | string[];
 };
 
 const getOpenAIApiKey = (): string | undefined => {
@@ -68,7 +77,25 @@ const fetchCurrentCo2 = async (): Promise<Co2Reading> => {
         },
       ],
       tools: [{ type: 'web_search' }],
-      response_format: { type: 'json_object' },
+      text: {
+        format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'co2_reading',
+            schema: {
+              type: 'object',
+              properties: {
+                ppm: { type: 'number' },
+                source: { type: 'string' },
+                timestamp: { type: 'string', format: 'date-time' },
+              },
+              required: ['ppm', 'source', 'timestamp'],
+              additionalProperties: false,
+            },
+            strict: true,
+          },
+        },
+      },
     }),
   });
 
@@ -78,20 +105,45 @@ const fetchCurrentCo2 = async (): Promise<Co2Reading> => {
   }
 
   const json = (await response.json()) as OpenAIResponse;
-  const rawContent =
-    json.output?.[0]?.content?.find((item) => item.type === 'output_text')?.text ??
-    json.output?.[0]?.content?.[0]?.text ??
-    json.output_text;
+  const contentItems = (json.output ?? []).flatMap((item) => item.content ?? []);
+  const isJsonContent = (
+    item: OpenAIResponseContent
+  ): item is OpenAIResponseContent & { json?: unknown } => {
+    if (!item || typeof item !== 'object') {
+      return false;
+    }
+    const maybeType = (item as { type?: unknown }).type;
+    return maybeType === 'json' || maybeType === 'json_schema';
+  };
+  const isTextContent = (
+    item: OpenAIResponseContent
+  ): item is OpenAIResponseContent & { text: string } => {
+    if (!item || typeof item !== 'object') {
+      return false;
+    }
+    const maybeText = (item as { text?: unknown }).text;
+    return typeof maybeText === 'string';
+  };
 
-  if (!rawContent) {
-    throw new Error('OpenAI did not return any textual content.');
-  }
+  const structuredContent = contentItems.find(isJsonContent);
 
   let parsed: Co2Reading | undefined;
-  try {
-    parsed = JSON.parse(rawContent) as Co2Reading;
-  } catch (error) {
-    throw new Error('Failed to parse OpenAI response as JSON.');
+  if (structuredContent?.json && typeof structuredContent.json === 'object') {
+    parsed = structuredContent.json as Co2Reading;
+  } else {
+    const rawContentCandidate =
+      contentItems.find(isTextContent)?.text ??
+      (Array.isArray(json.output_text) ? json.output_text[0] : json.output_text);
+
+    if (!rawContentCandidate) {
+      throw new Error('OpenAI did not return any textual content.');
+    }
+
+    try {
+      parsed = JSON.parse(rawContentCandidate) as Co2Reading;
+    } catch (error) {
+      throw new Error('Failed to parse OpenAI response as JSON.');
+    }
   }
 
   if (typeof parsed.ppm !== 'number' || !parsed.source || !parsed.timestamp) {
