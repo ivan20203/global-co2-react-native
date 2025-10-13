@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "Global CO₂ Tracker",
+    "slug": "global-co2-react-native",
+    "scheme": "globalco2rn",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "platforms": ["ios", "android", "web"],
+    "assetBundlePatterns": ["**/*"],
+    "extra": {
+      "openaiApiKey": ""
+    }
+  }
+}
