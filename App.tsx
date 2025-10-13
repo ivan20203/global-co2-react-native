@@ -67,15 +67,11 @@ const App: React.FC = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle={Platform.OS === 'ios' ? 'light-content' : 'light-content'} />
       <View style={styles.container}>
-        <Text style={styles.title}>Global CO₂ Outlook</Text>
-        <Text style={styles.subtitle}>
-          Track our current trajectory and understand the milestones that shape the planet&apos;s future.
-        </Text>
 
         <View style={styles.tabBar}>
           {([
             { key: 'now' as Tab, label: 'Today' },
-            { key: 'future' as Tab, label: 'Future Milestones' },
+            { key: 'future' as Tab, label: 'Future Forecasts' },
           ] as const).map((tab) => {
             const selected = activeTab === tab.key;
             return (
@@ -101,7 +97,7 @@ const App: React.FC = () => {
               </View>
               <Text style={styles.heroDescription}>
                 Scientists track atmospheric CO₂ as the clearest indicator of how much heat we trap.
-                Holding steady at 420 ppm keeps the planet warmer than at any time in modern history.
+                Holding steady at 420 ppm keeps the planet warmer than at any time in human history.
               </Text>
               <View style={styles.statRow}>
                 <View style={styles.statBlock}>
@@ -115,6 +111,10 @@ const App: React.FC = () => {
                 <View style={styles.statBlock}>
                   <Text style={styles.statLabel}>Share of CO₂</Text>
                   <Text style={styles.statValue}>~76% of GHGs</Text>
+                </View>
+                <View style={styles.statBlock}>
+                  <Text style={styles.statLabel}>Daily CO₂ Increase</Text>
+                  <Text style={styles.statValue}>~0.0001ppm</Text>
                 </View>
               </View>
               <Text style={styles.footnote}>
