@@ -1,9 +1,7 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Linking,
   Platform,
-  RefreshControl,
+  Pressable,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -11,256 +9,136 @@ import {
   Text,
   View,
 } from 'react-native';
-import Constants from 'expo-constants';
 
-type Co2Reading = {
-  ppm: number;
-  source: string;
-  timestamp: string;
-};
+const CURRENT_PPM = 420;
 
-type OpenAIResponseContent =
-  | {
-      type?: 'output_text' | string;
-      text?: string;
-    }
-  | {
-      type?: 'json' | 'json_schema';
-      json?: unknown;
-      name?: string;
-    }
-  | Record<string, unknown>;
+const formatPpm = (ppm: number): string => `${ppm.toLocaleString()} ppm`;
 
-type OpenAIResponse = {
-  output?: Array<{
-    content?: Array<OpenAIResponseContent>;
-  }>;
-  output_text?: string | string[];
-};
+const SCENARIOS = [
+  {
+    ppm: 350,
+    title: 'Pre-industrial balance',
+    description:
+      'A climate similar to the early 20th century. Ice sheets remain stable, coral reefs thrive, and weather patterns stay within historical ranges.',
+  },
+  {
+    ppm: 420,
+    title: 'Where we stand today',
+    description:
+      'The planet is experiencing record-breaking heat, more intense wildfires, and widespread coral bleaching. Extreme storms are increasingly common.',
+  },
+  {
+    ppm: 450,
+    title: 'Critical warming threshold',
+    description:
+      'Exceeding 1.5°C of warming becomes likely. Mountain glaciers disappear, summer Arctic sea ice vanishes, and crop yields fall across the tropics.',
+  },
+  {
+    ppm: 500,
+    title: 'A new Arctic reality',
+    description:
+      'The North Pole spends the majority of the year ice-free, opening year-round Arctic shipping routes. Coastal communities worldwide face frequent flooding.',
+  },
+  {
+    ppm: 550,
+    title: 'Runaway feedbacks',
+    description:
+      'Permafrost thaw releases vast stores of methane. Global droughts and megastorms strain infrastructure and drive mass displacement.',
+  },
+  {
+    ppm: 600,
+    title: 'Radically altered Earth',
+    description:
+      'Sea levels are meters higher, forcing the relocation of major cities. Many ecosystems collapse, and keeping outdoor labor safe becomes a daily challenge.',
+  },
+] as const;
 
-const getOpenAIApiKey = (): string | undefined => {
-  const envKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY ?? process.env.OPENAI_API_KEY;
-  if (envKey && envKey.length > 0) {
-    return envKey;
-  }
-
-  const extraKey = Constants?.expoConfig?.extra?.openaiApiKey as string | undefined;
-  return extraKey && extraKey.length > 0 ? extraKey : undefined;
-};
-
-const fetchCurrentCo2 = async (): Promise<Co2Reading> => {
-  const apiKey = getOpenAIApiKey();
-  if (!apiKey) {
-    throw new Error(
-      'Missing OpenAI API key. Provide EXPO_PUBLIC_OPENAI_API_KEY in your environment or set expo.extra.openaiApiKey in app.json.'
-    );
-  }
-
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: 'gpt-4.1-mini',
-      input: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'input_text',
-              text:
-                'Use web_search to find the most recent global atmospheric CO2 concentration in parts per million (ppm). Respond with JSON containing fields "ppm" (number), "source" (string URL), and "timestamp" (ISO 8601 date of the measurement).',
-            },
-          ],
-        },
-      ],
-      tools: [{ type: 'web_search' }],
-      text: {
-        format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'co2_reading',
-            schema: {
-              type: 'object',
-              properties: {
-                ppm: { type: 'number' },
-                source: { type: 'string' },
-                timestamp: { type: 'string', format: 'date-time' },
-              },
-              required: ['ppm', 'source', 'timestamp'],
-              additionalProperties: false,
-            },
-            strict: true,
-          },
-        },
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI request failed: ${response.status} ${response.statusText} - ${errorText}`);
-  }
-
-  const json = (await response.json()) as OpenAIResponse;
-  const contentItems = (json.output ?? []).flatMap((item) => item.content ?? []);
-  const isJsonContent = (
-    item: OpenAIResponseContent
-  ): item is OpenAIResponseContent & { json?: unknown } => {
-    if (!item || typeof item !== 'object') {
-      return false;
-    }
-    const maybeType = (item as { type?: unknown }).type;
-    return maybeType === 'json' || maybeType === 'json_schema';
-  };
-  const isTextContent = (
-    item: OpenAIResponseContent
-  ): item is OpenAIResponseContent & { text: string } => {
-    if (!item || typeof item !== 'object') {
-      return false;
-    }
-    const maybeText = (item as { text?: unknown }).text;
-    return typeof maybeText === 'string';
-  };
-
-  const structuredContent = contentItems.find(isJsonContent);
-
-  let parsed: Co2Reading | undefined;
-  if (structuredContent?.json && typeof structuredContent.json === 'object') {
-    parsed = structuredContent.json as Co2Reading;
-  } else {
-    const rawContentCandidate =
-      contentItems.find(isTextContent)?.text ??
-      (Array.isArray(json.output_text) ? json.output_text[0] : json.output_text);
-
-    if (!rawContentCandidate) {
-      throw new Error('OpenAI did not return any textual content.');
-    }
-
-    try {
-      parsed = JSON.parse(rawContentCandidate) as Co2Reading;
-    } catch (error) {
-      throw new Error('Failed to parse OpenAI response as JSON.');
-    }
-  }
-
-  if (typeof parsed.ppm !== 'number' || !parsed.source || !parsed.timestamp) {
-    throw new Error('OpenAI response JSON was missing required fields.');
-  }
-
-  return parsed;
-};
-
-const formatPpm = (ppm: number): string => `${ppm.toFixed(2)} ppm`;
-
-const formatDate = (iso: string): string => {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) {
-    return iso;
-  }
-  return date.toLocaleString();
-};
+type Tab = 'now' | 'future';
 
 const App: React.FC = () => {
-  const [reading, setReading] = useState<Co2Reading | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>('now');
 
-  const loadReading = useCallback(async () => {
-    setError(null);
-    try {
-      const result = await fetchCurrentCo2();
-      setReading(result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error fetching CO2 levels.';
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadReading();
-  }, [loadReading]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    setLoading(true);
-    try {
-      await loadReading();
-    } finally {
-      setRefreshing(false);
-    }
-  }, [loadReading]);
-
-  const content = useMemo(() => {
-    if (loading && !refreshing && !reading) {
-      return (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={styles.metric.color} />
-          <Text style={styles.loadingText}>Fetching today&apos;s CO₂ levels…</Text>
-        </View>
-      );
-    }
-
-    if (error) {
-      return (
-        <View style={styles.centered}>
-          <Text style={styles.errorTitle}>Could not load CO₂ data</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-        </View>
-      );
-    }
-
-    if (!reading) {
-      return (
-        <View style={styles.centered}>
-          <Text style={styles.errorTitle}>No data available</Text>
-        </View>
-      );
-    }
-
-    return (
-      <View style={styles.metricContainer}>
-        <Text style={styles.metricLabel}>Today&apos;s Global CO₂ Concentration</Text>
-        <Text style={styles.metric}>{formatPpm(reading.ppm)}</Text>
-        <View style={styles.metaContainer}>
-          <Text style={styles.metaLabel}>Measured:</Text>
-          <Text style={styles.metaValue}>{formatDate(reading.timestamp)}</Text>
-        </View>
-        <View style={styles.metaContainer}>
-          <Text style={styles.metaLabel}>Source:</Text>
-          <Text
-            style={[styles.metaValue, styles.link]}
-            onPress={() => {
-              if (reading.source) {
-                void Linking.openURL(reading.source);
-              }
-            }}
-          >
-            {reading.source}
-          </Text>
-        </View>
-      </View>
-    );
-  }, [error, loading, reading, refreshing]);
+  const sortedScenarios = useMemo(
+    () => [...SCENARIOS].sort((a, b) => a.ppm - b.ppm),
+    []
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle={Platform.OS === 'ios' ? 'dark-content' : 'light-content'} />
-      <ScrollView
-        contentContainerStyle={styles.scrollContainer}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      >
-        <Text style={styles.title}>Global CO₂ Tracker</Text>
+      <StatusBar barStyle={Platform.OS === 'ios' ? 'light-content' : 'light-content'} />
+      <View style={styles.container}>
+        <Text style={styles.title}>Global CO₂ Outlook</Text>
         <Text style={styles.subtitle}>
-          Data sourced on demand via OpenAI web search. Pull to refresh for the latest reading.
+          Track our current trajectory and understand the milestones that shape the planet&apos;s future.
         </Text>
-        {content}
-      </ScrollView>
+
+        <View style={styles.tabBar}>
+          {([
+            { key: 'now' as Tab, label: 'Today' },
+            { key: 'future' as Tab, label: 'Future Milestones' },
+          ] as const).map((tab) => {
+            const selected = activeTab === tab.key;
+            return (
+              <Pressable
+                key={tab.key}
+                onPress={() => setActiveTab(tab.key)}
+                style={[styles.tabButton, selected && styles.tabButtonActive]}
+              >
+                <Text style={[styles.tabButtonText, selected && styles.tabButtonTextActive]}>
+                  {tab.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {activeTab === 'now' ? (
+            <View style={styles.heroCard}>
+              <View style={styles.heroHeader}>
+                <Text style={styles.heroLabel}>Estimated atmospheric concentration</Text>
+                <Text style={styles.heroPpm}>{formatPpm(CURRENT_PPM)}</Text>
+              </View>
+              <Text style={styles.heroDescription}>
+                Scientists track atmospheric CO₂ as the clearest indicator of how much heat we trap.
+                Holding steady at 420 ppm keeps the planet warmer than at any time in modern history.
+              </Text>
+              <View style={styles.statRow}>
+                <View style={styles.statBlock}>
+                  <Text style={styles.statLabel}>Since 1980</Text>
+                  <Text style={styles.statValue}>+90 ppm</Text>
+                </View>
+                <View style={styles.statBlock}>
+                  <Text style={styles.statLabel}>Approx. warming</Text>
+                  <Text style={styles.statValue}>~1.2°C</Text>
+                </View>
+                <View style={styles.statBlock}>
+                  <Text style={styles.statLabel}>Share of CO₂</Text>
+                  <Text style={styles.statValue}>~76% of GHGs</Text>
+                </View>
+              </View>
+              <Text style={styles.footnote}>
+                Data shown is illustrative and will be replaced with live measurements in future releases.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.timeline}>
+              {sortedScenarios.map((scenario, index) => (
+                <View key={scenario.ppm} style={styles.timelineItem}>
+                  <View style={styles.timelineMarker}>
+                    <Text style={styles.timelineMarkerText}>{scenario.ppm}</Text>
+                  </View>
+                  <View style={styles.timelineContent}>
+                    <Text style={styles.timelineTitle}>{scenario.title}</Text>
+                    <Text style={styles.timelineDescription}>{scenario.description}</Text>
+                    {index < sortedScenarios.length - 1 && <View style={styles.divider} />}
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 };
@@ -268,84 +146,172 @@ const App: React.FC = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#020617',
   },
-  scrollContainer: {
-    flexGrow: 1,
-    padding: 24,
+  container: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 16,
     gap: 16,
-    justifyContent: 'flex-start',
   },
   title: {
     fontSize: 32,
-    fontWeight: '700',
-    color: '#f1f5f9',
-    marginBottom: 4,
+    fontWeight: '800',
+    color: '#f8fafc',
+    letterSpacing: 0.5,
   },
   subtitle: {
     fontSize: 16,
     color: '#cbd5f5',
-    marginBottom: 12,
+    lineHeight: 22,
   },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 12,
-    marginTop: 48,
-  },
-  loadingText: {
-    color: '#e2e8f0',
-    fontSize: 16,
-  },
-  metricContainer: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 24,
-    gap: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  metricLabel: {
-    color: '#94a3b8',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  metric: {
-    color: '#38bdf8',
-    fontSize: 48,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-  metaContainer: {
+  tabBar: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: 8,
+  },
+  tabButton: {
+    flex: 1,
+    borderRadius: 999,
+    backgroundColor: '#0f172a',
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.35)',
+  },
+  tabButtonActive: {
+    backgroundColor: '#38bdf8',
+    shadowColor: '#0ea5e9',
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+    borderColor: '#38bdf8',
+  },
+  tabButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#94a3b8',
+  },
+  tabButtonTextActive: {
+    color: '#0f172a',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingVertical: 8,
+  },
+  heroCard: {
+    backgroundColor: '#111827',
+    borderRadius: 24,
+    padding: 24,
+    gap: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 10,
+  },
+  heroHeader: {
     gap: 8,
   },
-  metaLabel: {
-    color: '#cbd5f5',
-    fontWeight: '600',
-  },
-  metaValue: {
-    color: '#e2e8f0',
-    flexShrink: 1,
-  },
-  link: {
-    textDecorationLine: 'underline',
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#f87171',
-  },
-  errorMessage: {
+  heroLabel: {
     fontSize: 16,
-    color: '#fecaca',
-    textAlign: 'center',
-    paddingHorizontal: 16,
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    fontWeight: '700',
+  },
+  heroPpm: {
+    fontSize: 64,
+    fontWeight: '900',
+    color: '#38bdf8',
+    letterSpacing: 1.5,
+  },
+  heroDescription: {
+    fontSize: 16,
+    color: '#e2e8f0',
+    lineHeight: 24,
+  },
+  statRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  statBlock: {
+    flexBasis: '30%',
+    minWidth: 120,
+    backgroundColor: '#1e293b',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.25)',
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#94a3b8',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+    fontWeight: '700',
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#f8fafc',
+  },
+  footnote: {
+    fontSize: 13,
+    color: '#94a3b8',
+    lineHeight: 18,
+  },
+  timeline: {
+    gap: 20,
+    paddingBottom: 40,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  timelineMarker: {
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    backgroundColor: '#1e293b',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(59, 130, 246, 0.4)',
+  },
+  timelineMarkerText: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#38bdf8',
+  },
+  timelineContent: {
+    flex: 1,
+    backgroundColor: '#111827',
+    borderRadius: 18,
+    padding: 16,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.25)',
+  },
+  timelineTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#f1f5f9',
+  },
+  timelineDescription: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#e2e8f0',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(148, 163, 184, 0.2)',
+    marginTop: 12,
   },
 });
 
