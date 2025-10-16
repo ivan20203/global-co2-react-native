@@ -25,20 +25,18 @@ const REQUEST_BODY = {
   text: {
     format: {
       type: 'json_schema',
-      json_schema: {
-        name: 'co2_reading',
-        schema: {
-          type: 'object',
-          properties: {
-            ppm: { type: 'number' },
-            source: { type: 'string' },
-            timestamp: { type: 'string', format: 'date-time' },
-          },
-          required: ['ppm', 'source', 'timestamp'],
-          additionalProperties: false,
+      name: 'co2_reading',
+      schema: {
+        type: 'object',
+        properties: {
+          ppm: { type: 'number' },
+          source: { type: 'string' },
+          timestamp: { type: 'string', format: 'date-time' },
         },
-        strict: true,
+        required: ['ppm', 'source', 'timestamp'],
+        additionalProperties: false,
       },
+      strict: true,
     },
   },
 };
