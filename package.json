@@ -8,7 +8,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "echo \"No automated tests configured\""
+    "test": "echo \"No automated tests configured\"",
+    "update:co2": "node scripts/update-co2.mjs"
   },
   "dependencies": {
     "expo": "^54.0.13",
