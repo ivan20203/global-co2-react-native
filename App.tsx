@@ -1,7 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Linking,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -9,8 +12,58 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import Constants from 'expo-constants';
 
-const CURRENT_PPM = 420;
+type Co2Reading = {
+  ppm: number;
+  timestamp: string;
+  source: string;
+  updated_at?: string;
+};
+const FALLBACK_READING: Co2Reading = {
+  ppm: 420,
+  timestamp: '2004-01-01T00:00:00Z',
+  source: 'https://gml.noaa.gov/ccgg/trends/',
+};
+
+const getCo2DataUrl = (): string | undefined => {
+  const envUrl = process.env.EXPO_PUBLIC_CO2_DATA_URL ?? process.env.CO2_DATA_URL;
+  if (envUrl && envUrl.length > 0) {
+    return envUrl;
+  }
+  const extraUrl = Constants?.expoConfig?.extra?.co2DataUrl as string | undefined;
+  return extraUrl && extraUrl.length > 0 ? extraUrl : undefined;
+};
+
+const fetchLatestCo2 = async (): Promise<Co2Reading> => {
+  const url = getCo2DataUrl();
+  if (!url) {
+    throw new Error(
+      'Missing CO₂ data URL. Set EXPO_PUBLIC_CO2_DATA_URL or expo.extra.co2DataUrl to the JSON endpoint (e.g., GitHub raw URL).'
+    );
+  }
+
+  const response = await fetch(url, {
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`CO₂ data request failed: ${response.status} ${response.statusText} - ${errorText}`);
+  }
+
+  const json = (await response.json()) as Partial<Co2Reading>;
+  if (typeof json.ppm !== 'number' || !json.timestamp || !json.source) {
+    throw new Error('CO₂ data JSON missing required fields.');
+  }
+
+  return {
+    ppm: json.ppm,
+    timestamp: json.timestamp,
+    source: json.source,
+    updated_at: json.updated_at,
+  };
+};
 
 const formatPpm = (ppm: number): string => `${ppm.toLocaleString()} ppm`;
 
@@ -57,11 +110,48 @@ type Tab = 'now' | 'future';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('now');
+  const [reading, setReading] = useState<Co2Reading | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const sortedScenarios = useMemo(
     () => [...SCENARIOS].sort((a, b) => a.ppm - b.ppm),
     []
   );
+
+  const loadReading = useCallback(async () => {
+    setError(null);
+    try {
+      const result = await fetchLatestCo2();
+      setReading(result);
+    } catch (err) {
+      const message =
+        err instanceof Error
+          ? 'We could not reach the live CO₂ service. Showing a recent estimate instead.'
+          : 'Live CO₂ data is temporarily unavailable.';
+      setError(message);
+      setReading(FALLBACK_READING);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadReading();
+  }, [loadReading]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadReading();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadReading]);
+
+  const displayReading = reading ?? FALLBACK_READING;
+  const isInitialLoading = loading && !reading;
 
   return (
     <SafeAreaProvider>
@@ -89,37 +179,50 @@ const App: React.FC = () => {
             })}
           </View>
 
-          <ScrollView contentContainerStyle={styles.scrollContent}>
-            {activeTab === 'now' ? (
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#38bdf8" />}
+          >
+            {isInitialLoading ? (
+              <View style={styles.centered}>
+                <ActivityIndicator size="large" color="#38bdf8" />
+                <Text style={styles.loadingText}>Fetching latest CO₂ levels…</Text>
+              </View>
+            ) : activeTab === 'now' ? (
               <View style={styles.heroCard}>
                 <View style={styles.heroHeader}>
                   <Text style={styles.heroLabel}>Estimated atmospheric concentration</Text>
-                  <Text style={styles.heroPpm}>{formatPpm(CURRENT_PPM)}</Text>
+                  <Text style={styles.heroPpm}>{formatPpm(displayReading.ppm)}</Text>
                 </View>
                 <Text style={styles.heroDescription}>
-                  Scientists track atmospheric CO₂ as the clearest indicator of how much heat we trap.
-                  Holding steady at 420 ppm keeps the planet warmer than at any time in human history.
+                  Atmospheric CO₂ tells us how much heat the planet is trapping. These numbers refresh once a day from trusted climate monitors.
                 </Text>
                 <View style={styles.statRow}>
                   <View style={styles.statBlock}>
-                    <Text style={styles.statLabel}>Since 1980</Text>
-                    <Text style={styles.statValue}>+90 ppm</Text>
+                    <Text style={styles.statLabel}>Latest reading</Text>
+                    <Text style={styles.statValue}>{new Date(displayReading.timestamp).toLocaleDateString()}</Text>
                   </View>
                   <View style={styles.statBlock}>
-                    <Text style={styles.statLabel}>Approx. warming</Text>
-                    <Text style={styles.statValue}>~1.2°C</Text>
+                    <Text style={styles.statLabel}>Increase Since 1980</Text>
+                    <Text style={styles.statValue}>
+                      {formatPpm(displayReading.ppm - 338.75)}
+                    </Text>
                   </View>
                   <View style={styles.statBlock}>
-                    <Text style={styles.statLabel}>Share of CO₂</Text>
-                    <Text style={styles.statValue}>~76% of GHGs</Text>
-                  </View>
-                  <View style={styles.statBlock}>
-                    <Text style={styles.statLabel}>Daily CO₂ Increase</Text>
-                    <Text style={styles.statValue}>~0.0001ppm</Text>
+                    <Text style={styles.statLabel}>Last updated</Text>
+                    <Text style={styles.statValue}>
+                      {displayReading.updated_at
+                        ? new Date(displayReading.updated_at).toLocaleString()
+                        : 'Refreshing soon'}
+                    </Text>
                   </View>
                 </View>
+                {error ? <Text style={styles.errorMessage}>{error}</Text> : null}
                 <Text style={styles.footnote}>
-                  Data shown is illustrative and will be replaced with live measurements in future releases.
+                  Source:{' '}
+                  <Text style={styles.link} onPress={() => void Linking.openURL(displayReading.source)}>
+                    See latest report
+                  </Text>
                 </Text>
               </View>
             ) : (
@@ -262,6 +365,27 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
     color: '#f8fafc',
+  },
+  centered: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    paddingVertical: 64,
+  },
+  loadingText: {
+    color: '#cbd5f5',
+    fontSize: 16,
+  },
+  link: {
+    color: '#38bdf8',
+    textDecorationLine: 'underline',
+  },
+  errorMessage: {
+    marginTop: 12,
+    color: '#fca5a5',
+    fontSize: 14,
+    lineHeight: 18,
   },
   footnote: {
     fontSize: 13,
