@@ -2,13 +2,13 @@ import React, { useMemo, useState } from 'react';
 import {
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 const CURRENT_PPM = 420;
 
@@ -64,82 +64,84 @@ const App: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle={Platform.OS === 'ios' ? 'light-content' : 'light-content'} />
-      <View style={styles.container}>
+    <SafeAreaProvider>
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar barStyle={Platform.OS === 'ios' ? 'light-content' : 'light-content'} />
+        <View style={styles.container}>
 
-        <View style={styles.tabBar}>
-          {([
-            { key: 'now' as Tab, label: 'Today' },
-            { key: 'future' as Tab, label: 'Future Forecasts' },
-          ] as const).map((tab) => {
-            const selected = activeTab === tab.key;
-            return (
-              <Pressable
-                key={tab.key}
-                onPress={() => setActiveTab(tab.key)}
-                style={[styles.tabButton, selected && styles.tabButtonActive]}
-              >
-                <Text style={[styles.tabButtonText, selected && styles.tabButtonTextActive]}>
-                  {tab.label}
+          <View style={styles.tabBar}>
+            {([
+              { key: 'now' as Tab, label: 'Today' },
+              { key: 'future' as Tab, label: 'Future Forecasts' },
+            ] as const).map((tab) => {
+              const selected = activeTab === tab.key;
+              return (
+                <Pressable
+                  key={tab.key}
+                  onPress={() => setActiveTab(tab.key)}
+                  style={[styles.tabButton, selected && styles.tabButtonActive]}
+                >
+                  <Text style={[styles.tabButtonText, selected && styles.tabButtonTextActive]}>
+                    {tab.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <ScrollView contentContainerStyle={styles.scrollContent}>
+            {activeTab === 'now' ? (
+              <View style={styles.heroCard}>
+                <View style={styles.heroHeader}>
+                  <Text style={styles.heroLabel}>Estimated atmospheric concentration</Text>
+                  <Text style={styles.heroPpm}>{formatPpm(CURRENT_PPM)}</Text>
+                </View>
+                <Text style={styles.heroDescription}>
+                  Scientists track atmospheric CO₂ as the clearest indicator of how much heat we trap.
+                  Holding steady at 420 ppm keeps the planet warmer than at any time in human history.
                 </Text>
-              </Pressable>
-            );
-          })}
+                <View style={styles.statRow}>
+                  <View style={styles.statBlock}>
+                    <Text style={styles.statLabel}>Since 1980</Text>
+                    <Text style={styles.statValue}>+90 ppm</Text>
+                  </View>
+                  <View style={styles.statBlock}>
+                    <Text style={styles.statLabel}>Approx. warming</Text>
+                    <Text style={styles.statValue}>~1.2°C</Text>
+                  </View>
+                  <View style={styles.statBlock}>
+                    <Text style={styles.statLabel}>Share of CO₂</Text>
+                    <Text style={styles.statValue}>~76% of GHGs</Text>
+                  </View>
+                  <View style={styles.statBlock}>
+                    <Text style={styles.statLabel}>Daily CO₂ Increase</Text>
+                    <Text style={styles.statValue}>~0.0001ppm</Text>
+                  </View>
+                </View>
+                <Text style={styles.footnote}>
+                  Data shown is illustrative and will be replaced with live measurements in future releases.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.timeline}>
+                {sortedScenarios.map((scenario, index) => (
+                  <View key={scenario.ppm} style={styles.timelineItem}>
+                    <View style={styles.timelineMarker}>
+                      <Text style={styles.timelineMarkerText}>{scenario.ppm}</Text>
+                    </View>
+                    <View style={styles.timelineContent}>
+                      <Text style={styles.timelineTitle}>{scenario.title}</Text>
+                      <Text style={styles.timelineDescription}>{scenario.description}</Text>
+                      {index < sortedScenarios.length - 1 && <View style={styles.divider} />}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </ScrollView>
         </View>
-
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {activeTab === 'now' ? (
-            <View style={styles.heroCard}>
-              <View style={styles.heroHeader}>
-                <Text style={styles.heroLabel}>Estimated atmospheric concentration</Text>
-                <Text style={styles.heroPpm}>{formatPpm(CURRENT_PPM)}</Text>
-              </View>
-              <Text style={styles.heroDescription}>
-                Scientists track atmospheric CO₂ as the clearest indicator of how much heat we trap.
-                Holding steady at 420 ppm keeps the planet warmer than at any time in human history.
-              </Text>
-              <View style={styles.statRow}>
-                <View style={styles.statBlock}>
-                  <Text style={styles.statLabel}>Since 1980</Text>
-                  <Text style={styles.statValue}>+90 ppm</Text>
-                </View>
-                <View style={styles.statBlock}>
-                  <Text style={styles.statLabel}>Approx. warming</Text>
-                  <Text style={styles.statValue}>~1.2°C</Text>
-                </View>
-                <View style={styles.statBlock}>
-                  <Text style={styles.statLabel}>Share of CO₂</Text>
-                  <Text style={styles.statValue}>~76% of GHGs</Text>
-                </View>
-                <View style={styles.statBlock}>
-                  <Text style={styles.statLabel}>Daily CO₂ Increase</Text>
-                  <Text style={styles.statValue}>~0.0001ppm</Text>
-                </View>
-              </View>
-              <Text style={styles.footnote}>
-                Data shown is illustrative and will be replaced with live measurements in future releases.
-              </Text>
-            </View>
-          ) : (
-            <View style={styles.timeline}>
-              {sortedScenarios.map((scenario, index) => (
-                <View key={scenario.ppm} style={styles.timelineItem}>
-                  <View style={styles.timelineMarker}>
-                    <Text style={styles.timelineMarkerText}>{scenario.ppm}</Text>
-                  </View>
-                  <View style={styles.timelineContent}>
-                    <Text style={styles.timelineTitle}>{scenario.title}</Text>
-                    <Text style={styles.timelineDescription}>{scenario.description}</Text>
-                    {index < sortedScenarios.length - 1 && <View style={styles.divider} />}
-                  </View>
-                </View>
-              ))}
-            </View>
-          )}
-        </ScrollView>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 };
 
