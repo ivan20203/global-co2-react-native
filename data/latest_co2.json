@@ -1,6 +1,6 @@
 {
-  "ppm": 427.35,
-  "timestamp": "2025-12-31T00:00:00Z",
-  "source": "https://www.gml.noaa.gov/ccgg/trends/global.html",
-  "updated_at": "2026-03-18T05:59:50.247Z"
+  "ppm": 422.5,
+  "timestamp": "2024-12-31T23:59:59Z",
+  "source": "https://globalcarbonbudget.org/download/1918/?tmstv=1732802221",
+  "updated_at": "2026-03-19T05:55:02.440Z"
 }
