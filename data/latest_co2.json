@@ -1,6 +1,6 @@
 {
-  "ppm": 422.1,
-  "timestamp": "2024-12-31T23:59:59Z",
-  "source": "https://sites.ecmwf.int/data/c3sci/global-climate-highlights/2024/press-release/GCH2024_PR_Fig6_timeseries_GHG_concentrations.pdf",
-  "updated_at": "2026-03-31T06:14:23.820Z"
+  "ppm": 427.44,
+  "timestamp": "2026-03-20T00:00:00Z",
+  "source": "https://gml.noaa.gov/ccgg/trends/gl_trend.html",
+  "updated_at": "2026-04-01T06:24:36.806Z"
 }
