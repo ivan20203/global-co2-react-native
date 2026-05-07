@@ -1,6 +1,6 @@
 {
-  "ppm": 429,
-  "timestamp": "2026-02-01T00:00:00Z",
-  "source": "https://science.nasa.gov/earth/explore/earth-indicators/carbon-dioxide/",
-  "updated_at": "2026-05-06T07:32:53.159Z"
+  "ppm": 427.57,
+  "timestamp": "2026-04-09T00:00:00Z",
+  "source": "https://gml.noaa.gov/ccgg/trends/gl_trend.html",
+  "updated_at": "2026-05-07T07:39:31.904Z"
 }
