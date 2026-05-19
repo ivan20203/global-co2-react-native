@@ -1,6 +1,6 @@
 {
-  "ppm": 427.67,
-  "timestamp": "2026-05-10T00:00:00Z",
-  "source": "https://gmd-int.cmdl.noaa.gov/ccgg/trends/gl_trend.html",
-  "updated_at": "2026-05-18T08:41:21.316Z"
+  "ppm": 428.53,
+  "timestamp": "2026-05-18T22:23:00-10:00",
+  "source": "https://gml.noaa.gov/ccgg/trends/global.html?doi=10.15138%2F9n0h-zh07",
+  "updated_at": "2026-05-19T08:23:03.178Z"
 }
