@@ -1,6 +1,6 @@
 {
-  "ppm": 429.35,
-  "timestamp": "2026-02-01T00:00:00Z",
-  "source": "https://www.climateobservatory.org/co2",
-  "updated_at": "2026-05-24T07:46:48.454Z"
+  "ppm": 428.53,
+  "timestamp": "2026-05-24T22:52:35-10:00",
+  "source": "https://www.gml.noaa.gov/ccgg/trends/global.html",
+  "updated_at": "2026-05-25T08:52:38.035Z"
 }
