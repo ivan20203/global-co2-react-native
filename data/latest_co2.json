@@ -1,6 +1,6 @@
 {
-  "ppm": 429,
-  "timestamp": "2026-07-01T00:00:00Z",
-  "source": "https://science.nasa.gov/earth/explore/earth-indicators/carbon-dioxide/",
-  "updated_at": "2026-09-09T09:21:19.477Z"
+  "ppm": 429.35,
+  "timestamp": "2026-09-10T09:20:43-07:00",
+  "source": "https://www.statista.com/statistics/1091999/atmospheric-concentration-of-co2-historic/",
+  "updated_at": "2026-09-10T09:20:44.784Z"
 }
