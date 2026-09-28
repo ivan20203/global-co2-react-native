@@ -1,6 +1,6 @@
 {
-  "ppm": 425.8,
-  "timestamp": "2026-09-22T00:00:00Z",
-  "source": "https://www.stateofthe.earth/indicator/co2",
-  "updated_at": "2026-09-27T10:19:45.072Z"
+  "ppm": 427.98,
+  "timestamp": "2026-09-25T00:00:00Z",
+  "source": "https://gmd-prod.cmdl.noaa.gov/ccgg/trends/gl_trend.html",
+  "updated_at": "2026-09-28T11:23:37.941Z"
 }
